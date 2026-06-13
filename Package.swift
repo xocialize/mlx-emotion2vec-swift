@@ -16,7 +16,7 @@ let package = Package(
         .library(name: "MLXEmotion2Vec", targets: ["MLXEmotion2Vec"]),
     ],
     dependencies: [
-        .package(path: "../mlx-engine-swift"),
+        .package(url: "https://github.com/xocialize/mlx-engine-swift", from: "0.3.0"),
         .package(url: "https://github.com/xocialize/emotion2vec-mlx-swift.git", from: "0.1.0"),
         .package(url: "https://github.com/huggingface/swift-transformers", from: "1.1.6"),
     ],
