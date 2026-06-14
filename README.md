@@ -39,4 +39,9 @@ let response = try await engine.run(SpeechEmotionRequest(audio: speech)) as! Spe
 print(response.label, response.confidence)   // e.g. "happy" 0.87
 ```
 
+## Consuming it
+
+Public + version-tagged on github.com/xocialize. Add by tagged URL:
+`.package(url: "https://github.com/xocialize/mlx-emotion2vec-swift", from: "0.1.0")`, then import `MLXEmotion2Vec` (the conformant `speechEmotion` package). Builds standalone — its engine contract (`MLXToolKit`) and model-core dependencies are tagged-URL net deps, no local checkouts.
+
 Requirements: macOS 26+ (Apple Silicon, Metal GPU). Port code MIT; weights FunASR MODEL_LICENSE.
