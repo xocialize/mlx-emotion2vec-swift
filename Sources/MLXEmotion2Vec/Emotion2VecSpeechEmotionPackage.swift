@@ -1,7 +1,13 @@
 import Foundation
 import MLXToolKit
-import Hub
 import Emotion2VecMLX
+
+/// Errors specific to the emotion2vec package boundary.
+public enum Emotion2VecError: Error, Equatable {
+    /// Weight sources are missing and there is no store root (or resolved directory) to
+    /// materialize into.
+    case missingWeights(String)
+}
 
 /// An MLXEngine `speechEmotion` package over **emotion2vec+ large** — 9-class categorical speech
 /// emotion recognition. A thin conformance wrapper over the standalone `Emotion2VecMLX` engine
@@ -50,10 +56,22 @@ public final class Emotion2VecSpeechEmotionPackage: ModelPackage {
 
     public func load() async throws {
         guard recogniser == nil else { return }
-        let hub = configuration.modelsRootDirectory.map { HubApi(downloadBase: $0) } ?? HubApi()
-        let dir = try await hub.snapshot(from: Hub.Repo(id: configuration.repo),
-                                         matching: ["emotion2vec_large.safetensors",
-                                                    "emotion2vec_large_config.json"])
+        // Auto-materialize the missing checkpoint into the engine store (dir-less configs only;
+        // explicit directories never touch the network), forwarding progress via
+        // WeightDownloadProgress so the engine's PreparationMonitor surfaces `.downloading`.
+        let storeRoot = configuration.modelsRootDirectory
+        let missing = configuration.missingWeightSources(storeRoot: storeRoot)
+        if !missing.isEmpty {
+            guard let storeRoot else {
+                throw Emotion2VecError.missingWeights(
+                    "no models root set and sources missing: \(missing.map(\.role).joined(separator: ", "))")
+            }
+            try await WeightMaterializer.materialize(missing, into: storeRoot)
+        }
+        try Task.checkCancellation()
+        guard let dir = configuration.resolved(storeRoot: storeRoot).modelDirectory else {
+            throw Emotion2VecError.missingWeights("unresolved weights directory (no store root)")
+        }
         // Categorical-only: the dimensional (audeering) model is out of engine scope.
         recogniser = try await EmotionRecogniser(
             weightsDirectory: dir,

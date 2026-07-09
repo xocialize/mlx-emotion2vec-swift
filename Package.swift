@@ -16,9 +16,11 @@ let package = Package(
         .library(name: "MLXEmotion2Vec", targets: ["MLXEmotion2Vec"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/xocialize/mlx-engine-swift", from: "0.3.0"),
+        // Bumped to 0.23.0 for the WeightSourcing auto-materialization contract (types ≥0.19.0).
+        .package(url: "https://github.com/xocialize/mlx-engine-swift", from: "0.23.0"),
         .package(url: "https://github.com/xocialize/emotion2vec-mlx-swift.git", from: "0.1.0"),
-        .package(url: "https://github.com/huggingface/swift-transformers", from: "1.1.6"),
+        // Native downloader for WeightSourcing auto-materialization.
+        .package(url: "https://github.com/huggingface/swift-huggingface.git", from: "0.9.0"),
     ],
     targets: [
         .target(
@@ -27,7 +29,7 @@ let package = Package(
                 .product(name: "MLXToolKit", package: "mlx-engine-swift"),
                 // Package identity derives from the repo URL's last path component.
                 .product(name: "Emotion2VecMLX", package: "emotion2vec-mlx-swift"),
-                .product(name: "Hub", package: "swift-transformers"),
+                .product(name: "HuggingFace", package: "swift-huggingface"),
             ],
             // Emotion2VecMLX's `EmotionRecogniser` (MLX) isn't Sendable-audited, so awaiting its
             // nonisolated init back into the `@InferenceActor` trips strict region-isolation. The
@@ -41,6 +43,8 @@ let package = Package(
                 "MLXEmotion2Vec",
                 .product(name: "MLXToolKit", package: "mlx-engine-swift"),
                 .product(name: "MLXServeCore", package: "mlx-engine-swift"),
+                // The offline MAT-1..5 materialization gate.
+                .product(name: "MLXServeConformance", package: "mlx-engine-swift"),
             ]
         ),
     ]
