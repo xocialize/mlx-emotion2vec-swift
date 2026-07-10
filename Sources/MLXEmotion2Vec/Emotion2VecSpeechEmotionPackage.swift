@@ -83,12 +83,15 @@ public final class Emotion2VecSpeechEmotionPackage: ModelPackage {
     }
 
     public func run(_ request: any CapabilityRequest) async throws -> any CapabilityResponse {
+        // CAN-1: the entry checkpoint is the FIRST act of run() — before notLoaded validation
+        // (engine ≥ 0.27.0). No mid-run checkpoints: classify() is a single forward pass over
+        // one short utterance (one MLX eval) — the CAN-3 sub-second exemption.
+        try Task.checkCancellation()
         guard let recogniser else { throw PackageError.notLoaded }
         guard request.capability == .speechEmotion,
               let req = request as? SpeechEmotionRequest else {
             throw PackageError.unsupportedCapability(request.capability)
         }
-        try Task.checkCancellation()
 
         // EmotionRecogniser loads + resamples (to 16 kHz mono) from a file URL, so the bytes
         // round-trip through a temp file.
