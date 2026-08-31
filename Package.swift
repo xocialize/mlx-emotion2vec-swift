@@ -21,6 +21,8 @@ let package = Package(
         .package(url: "https://github.com/xocialize/emotion2vec-mlx-swift.git", from: "0.1.0"),
         // Native downloader for WeightSourcing auto-materialization.
         .package(url: "https://github.com/huggingface/swift-huggingface.git", from: "0.9.0"),
+        // Direct MLX dependency for unload()'s Memory.clearCache (AB-T-0107).
+        .package(url: "https://github.com/ml-explore/mlx-swift.git", from: "0.30.0"),
     ],
     targets: [
         .target(
@@ -30,6 +32,7 @@ let package = Package(
                 // Package identity derives from the repo URL's last path component.
                 .product(name: "Emotion2VecMLX", package: "emotion2vec-mlx-swift"),
                 .product(name: "HuggingFace", package: "swift-huggingface"),
+                .product(name: "MLX", package: "mlx-swift"),
             ],
             // Emotion2VecMLX's `EmotionRecogniser` (MLX) isn't Sendable-audited, so awaiting its
             // nonisolated init back into the `@InferenceActor` trips strict region-isolation. The

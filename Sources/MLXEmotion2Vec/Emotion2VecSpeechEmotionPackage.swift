@@ -1,4 +1,5 @@
 import Foundation
+import MLX
 import MLXToolKit
 import Emotion2VecMLX
 
@@ -31,8 +32,15 @@ public final class Emotion2VecSpeechEmotionPackage: ModelPackage {
             provenance: Provenance(sourceRepo: "mlx-community/emotion2vec-plus-large-mlx",
                                    revision: "main", tier: 1),
             requirements: RequirementsManifest(
-                // ~309 MB fp16 weights + conv/transformer activations over the clip.
-                footprints: [QuantFootprint(quant: .fp16, residentBytes: 1_000_000_000)],
+                // PHYS RE-BASELINED 2026-08-31 (AB-T-0107): direct-load harness, task_vm_info
+                // phys_footprint at 50 ms through a 10 s classify, two runs. Post-load floor
+                // 0.31 GB; held between runs (weights + MLX cache) 0.97 GB; in-run peak up to
+                // 1.11 GB — the old flat 1 GB was honest; this is the 1.14 split of the same
+                // envelope. Activation scales with clip length (conv over the clip): the 0.4 GB
+                // margin covers utterance-scale inputs, not long-form audio.
+                footprints: [QuantFootprint(quant: .fp16,
+                                            residentBytes: 1_000_000_000,
+                                            peakActivationBytes: 400_000_000)],
                 requiredBackends: [.metalGPU],
                 os: OSRequirement(minMacOS: SemanticVersion(major: 26, minor: 0, patch: 0)),
                 chipFloor: nil
@@ -80,6 +88,10 @@ public final class Emotion2VecSpeechEmotionPackage: ModelPackage {
 
     public func unload() async {
         recogniser = nil
+        // Return the memory for real: MLX's buffer cache survives the recogniser and holds
+        // the working set otherwise — phys_footprint would not fall and engine.evict /
+        // R-MEM-1 could not reclaim (AB-T-0107 hygiene sweep).
+        MLX.Memory.clearCache()
     }
 
     public func run(_ request: any CapabilityRequest) async throws -> any CapabilityResponse {
@@ -102,7 +114,12 @@ public final class Emotion2VecSpeechEmotionPackage: ModelPackage {
 
         let result = try await recogniser.classify(audioURL: tmp)
         let cat = result.categorical
-        let scores = cat.probabilities.map { EmotionScore(label: $0.key.rawValue, score: $0.value) }
+        // Descending by score AT SOURCE — probabilities is a Dictionary, and mapping it
+        // raw shipped a non-deterministic order every consumer had to re-sort
+        // (AB-T-0107 hygiene sweep).
+        let scores = cat.probabilities
+            .map { EmotionScore(label: $0.key.rawValue, score: $0.value) }
+            .sorted { $0.score > $1.score }
         return SpeechEmotionResponse(label: cat.label.rawValue, confidence: cat.confidence, scores: scores)
     }
 }
